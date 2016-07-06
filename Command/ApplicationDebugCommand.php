@@ -22,6 +22,8 @@ use Symfony\Component\HttpKernel\KernelInterface;
  * A console command to display kernel information.
  *
  * @author Roland Franssen <franssen.roland@gmail.com>
+ *
+ * @todo: reuse application reporter service instead.
  */
 class ApplicationDebugCommand extends ContainerAwareCommand
 {
