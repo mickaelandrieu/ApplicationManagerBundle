@@ -9,14 +9,16 @@
  * file that was distributed with this source code.
  */
 
-namespace Symfony\Bundle\FrameworkBundle\Command;
+namespace Am\ApplicationManagerBundle\Command;
 
+use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\HttpKernel\Kernel;
-use Symfony\Component\HttpKernel\KernelInterface;
+use Symfony\Component\Console\Helper\Helper as ConsoleHelper;
+
+use Am\ApplicationManagerBundle\Utils\ApplicationReporter;
 
 /**
  * A console command to display kernel information.
@@ -45,66 +47,43 @@ class ApplicationDebugCommand extends ContainerAwareCommand
     {
         $io = new SymfonyStyle($input, $output);
 
-        /** @var $kernel KernelInterface */
-        $kernel = $this->getContainer()->get('kernel');
-        $baseDir = realpath($kernel->getRootDir().DIRECTORY_SEPARATOR.'..');
-        $bundles = array_map(function ($bundle) use ($baseDir) {
-            return '* '.$bundle->getName().' (<comment>'.$this->formatPath($bundle->getPath(), $baseDir).'</comment>)';
-        }, $kernel->getBundles());
-        sort($bundles);
+        /** @var $applicationReporter ApplicationReporter */
+        $applicationReporter = $this->getContainer()->get('am_application_reporter');
+        $report = $applicationReporter->report();
 
-        $io->title('Welcome to Symfony '.Kernel::VERSION);
+        $io->title('Welcome to Symfony Application reporter');
         $io->success(array(
-            'Your application is now ready. You can start working on it at:',
-            $baseDir,
+            'Application available at: ' . $applicationReporter->getBaseDir(),
         ));
+
         $io->table(array(), array(
-            array('Kernel', get_class($kernel)),
-            array('Name', $kernel->getName()),
-            array('Version', Kernel::VERSION),
-            array('Version ID', Kernel::VERSION_ID),
-            array('End of maintenance', Kernel::END_OF_MAINTENANCE.($this->isExpired(Kernel::END_OF_MAINTENANCE) ? ' <error>Expired</error>' : '')),
-            array('End of life', Kernel::END_OF_LIFE.($this->isExpired(Kernel::END_OF_LIFE) ? ' <error>Expired</error>' : '')),
+            array('Kernel', $report['class']),
+            array('Name', $report['name']),
+            array('Version', $report['version']),
+            array('End of maintenance', $report['eom'] .($report['eom_expired'] ? ' <error>Expired</error>' : '')),
+            array('End of life', $report['eol'] .($report['eol_expired'] ? ' <error>Expired</error>' : '')),
             new TableSeparator(),
-            array('Environment', $kernel->getEnvironment()),
-            array('Debug', $kernel->isDebug() ? 'true' : 'false'),
-            array('Charset', $kernel->getCharset()),
-            array('Timezone', date_default_timezone_get().' (<comment>'.(new \DateTime())->format(\DateTime::W3C).'</comment>)'),
+            array('Environment', $report['env']),
+            array('Debug', $report['debug'] ? 'true' : 'false'),
+            array('Charset', $report['charset']),
+            array('Timezone', $report['timezone'].' (<comment>'.(new \DateTime())->format(\DateTime::W3C).'</comment>)'),
             new TableSeparator(),
-            array('Root directory', $this->formatPath($kernel->getRootDir(), $baseDir)),
-            array('Cache directory', $this->formatPath($kernel->getCacheDir(), $baseDir).' (<comment>'.$this->formatFilesize($kernel->getCacheDir()).'</comment>)'),
-            array('Log directory', $this->formatPath($kernel->getLogDir(), $baseDir).' (<comment>'.$this->formatFilesize($kernel->getLogDir()).'</comment>)'),
+            array('Root directory', $report['root_dir']),
+            array('Cache directory', $report['cache_dir'].' (<comment>'.ConsoleHelper::formatMemory($report['cache_dir']).'</comment>)'),
+            array('Log directory', $report['log_dir'].' (<comment>'.ConsoleHelper::formatMemory($report['log_dir']).'</comment>)'),
             new TableSeparator(),
-            array('Bundles (<comment>'.count($bundles).'</comment>)', implode(PHP_EOL, $bundles)),
+            array('Bundles (<comment>'.count($report['bundles']).'</comment>)', $this->getBundlesOutput($report['bundles'])),
         ));
     }
 
-    private function formatPath($path, $baseDir = null)
+    private function getBundlesOutput($bundles)
     {
-        return null !== $baseDir ? preg_replace('~^'.preg_quote($baseDir, '~').'~', '.', $path) : $path;
-    }
+        $output = '';
 
-    private function formatFilesize($path)
-    {
-        if (is_file($path)) {
-            $size = filesize($path) ?: 0;
-        } else {
-            $size = 0;
-            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS | \RecursiveDirectoryIterator::FOLLOW_SYMLINKS)) as $file) {
-                $size += $file->getSize();
-            }
+        foreach ($bundles as $bundle) {
+            $output .= $bundle['name'] . ' (<comment>' . $bundle['path'] . '</comment>)' . PHP_EOL;
         }
 
-        static $units = array('B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB');
-        for ($i = 0; $size >= 1024 && isset($units[$i]); $size /= 1024, ++$i);
-
-        return number_format($size, 2).$units[$i];
-    }
-
-    private function isExpired($date)
-    {
-        $date = \DateTime::createFromFormat('m/Y', $date);
-
-        return false !== $date && new \DateTime() > $date->modify('last day of this month 23:59:59');
+        return $output;
     }
 }

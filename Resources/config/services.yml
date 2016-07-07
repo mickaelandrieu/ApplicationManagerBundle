@@ -1,4 +1,4 @@
 services:
-#    application_manager.example:
-#        class: Am\ApplicationManagerBundle\Example
-#        arguments: ["@service_id", "plain_value", %parameter%]
+    am_application_reporter:
+        class: Am\ApplicationManagerBundle\Utils\ApplicationReporter
+        arguments: ['@kernel']

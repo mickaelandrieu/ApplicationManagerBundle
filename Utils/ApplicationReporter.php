@@ -58,6 +58,11 @@ class ApplicationReporter
         return get_class($this->kernel);
     }
 
+    public function getBaseDir()
+    {
+        return $this->baseDir;
+    }
+
     public function getName()
     {
         return $this->kernel->getName();
